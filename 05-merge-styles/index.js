@@ -1,6 +1,24 @@
 const path = require('node:path');
 const { readdir, createWriteStream, createReadStream } = require('node:fs');
 
+function compileFiles(from, to, extension, callback) {
+  const output = createWriteStream(to);
+
+  readdir(from, { recursive: true, withFileTypes: true }, (err, files) => {
+    if (err) callback(err);
+
+    for (const file of files) {
+      if (!file.isFile()) continue;
+      if (path.extname(file.name) !== extension) continue;
+
+      const filePath = path.join(file.path, file.name);
+      const input = createReadStream(filePath);
+
+      input.pipe(output);
+    }
+  });
+}
+
 const outputFolderName = 'project-dist';
 const outputFolderPath = path.join(__dirname, outputFolderName);
 
@@ -10,24 +28,8 @@ const outputFilePath = path.join(outputFolderPath, outputFileName);
 const sourceFolderName = 'styles';
 const sourceFolderPath = path.join(__dirname, sourceFolderName);
 
-const outputStream = createWriteStream(outputFilePath);
+compileFiles(sourceFolderPath, outputFilePath, '.css', (err) => {
+  if (err) throw err;
+});
 
-readdir(
-  sourceFolderPath,
-  { recursive: true, withFileTypes: true },
-  (err, files) => {
-    if (err) throw err;
-
-    for (const file of files) {
-      if (!file.isFile()) continue;
-      const fileExtension = path.extname(file.name);
-
-      if (fileExtension !== '.css') continue;
-
-      const inputPath = path.join(file.path, file.name);
-      const inputStream = createReadStream(inputPath);
-
-      inputStream.pipe(outputStream);
-    }
-  },
-);
+module.exports = { compileFiles };

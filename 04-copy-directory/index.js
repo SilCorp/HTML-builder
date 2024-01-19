@@ -2,19 +2,13 @@ const fs = require('fs');
 const path = require('node:path');
 const { readdir, copyFile } = require('node:fs');
 
-const newFolderName = 'files-copy';
-const newFolderPath = path.join(__dirname, newFolderName);
-
-const sourceFolderName = 'files';
-const sourceFolderPath = path.join(__dirname, sourceFolderName);
-
-function initCopyFolder(folderPath, callback) {
+function initFolder(folderPath, callback) {
   fs.mkdir(folderPath, { recursive: true }, (err, path) => {
     if (err) callback(err);
     const isFolderAlreadyExist = !path;
     if (isFolderAlreadyExist) {
       fs.rm(folderPath, { recursive: true, force: true }, () =>
-        initCopyFolder(folderPath, callback),
+        initFolder(folderPath, callback),
       );
       return;
     }
@@ -22,32 +16,45 @@ function initCopyFolder(folderPath, callback) {
     callback(err, path);
   });
 }
-
-function copyFolder(from, to) {
+function copyFolder(from, to, callback) {
   readdir(from, { withFileTypes: true }, (err, files) => {
-    if (err) throw err;
+    if (err) callback(err);
     for (const file of files) {
       const fileName = file.name;
       const copyFrom = path.join(from, fileName);
       const copyTo = path.join(to, fileName);
 
       if (file.isDirectory()) {
-        initCopyFolder(copyTo, (err) => {
-          if (err) throw err;
-          copyFolder(copyFrom, copyTo);
+        initFolder(copyTo, (err) => {
+          if (err) callback(err);
+          copyFolder(copyFrom, copyTo, callback);
         });
       }
 
       if (file.isFile()) {
         copyFile(copyFrom, copyTo, (err) => {
-          if (err) throw err;
+          if (err) callback(err);
         });
       }
     }
+    callback();
+  });
+}
+function syncFolder(source, destination, callback) {
+  initFolder(destination, (err) => {
+    if (err) callback(err);
+    copyFolder(source, destination, callback);
   });
 }
 
-initCopyFolder(newFolderPath, (err) => {
+const newFolderName = 'files-copy';
+const newFolderPath = path.join(__dirname, newFolderName);
+
+const sourceFolderName = 'files';
+const sourceFolderPath = path.join(__dirname, sourceFolderName);
+
+syncFolder(sourceFolderPath, newFolderPath, (err) => {
   if (err) throw err;
-  copyFolder(sourceFolderPath, newFolderPath);
 });
+
+module.exports = { syncFolder };
